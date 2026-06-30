@@ -23,6 +23,9 @@ app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
+const publicRoutes = require("./routes/publicRoutes");
+app.use("/api/public", publicRoutes);
+
 const settingsRoutes = require("./routes/settingsRoutes");
 app.use("/api/settings", settingsRoutes);
 

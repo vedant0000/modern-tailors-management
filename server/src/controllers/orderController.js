@@ -1,5 +1,6 @@
 const Order = require("../models/Order");
 const Setting = require("../models/Setting");
+const crypto = require("crypto");
 
 const createOrder = async (req, res) => {
   try {
@@ -31,14 +32,25 @@ const createOrder = async (req, res) => {
 
     const delivery = new Date(deliveryDate);
 
-    const cuttingDate = new Date(delivery);
-    cuttingDate.setDate(cuttingDate.getDate() - 2);
+    let finalCuttingDate;
 
-    const remainingAmount =
-      Number(totalAmount) - Number(advanceAmount);
+    if (req.body.cuttingDate) {
+      finalCuttingDate = new Date(req.body.cuttingDate);
+    } else {
+      finalCuttingDate = new Date(delivery);
+      finalCuttingDate.setDate(
+        finalCuttingDate.getDate() - 2
+      );
+    }
+
+    const remainingAmount = Number(totalAmount) - Number(advanceAmount);
+
+    const publicInvoiceId = crypto.randomBytes(16).toString("hex");
 
     const order = await Order.create({
       orderNumber: nextOrderNumber,
+
+      publicInvoiceId,
 
       customerName,
       mobileNumber,
@@ -55,7 +67,7 @@ const createOrder = async (req, res) => {
 
       deliveryDate: delivery,
 
-      cuttingDate,
+      cuttingDate: finalCuttingDate,
 
       payment: {
         totalAmount,
@@ -201,23 +213,25 @@ const updateOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
 
-    if (req.body.deliveryDate) {
-        const delivery = new Date(req.body.deliveryDate);
-
-        const cuttingDate = new Date(delivery);
-
-        cuttingDate.setDate(
-            cuttingDate.getDate() - 2
-        );
-
-        req.body.cuttingDate = cuttingDate;
-    }
-
     if (!order) {
       return res.status(404).json({
         success: false,
         message: "Order not found",
       });
+    }
+
+    // If delivery date is changed but cutting date is not provided,
+    // automatically set cutting date to delivery date - 2 days
+    if (req.body.deliveryDate && !req.body.cuttingDate) {
+      const delivery = new Date(req.body.deliveryDate);
+
+      const cuttingDate = new Date(delivery);
+
+      cuttingDate.setDate(
+        cuttingDate.getDate() - 2
+      );
+
+      req.body.cuttingDate = cuttingDate;
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(

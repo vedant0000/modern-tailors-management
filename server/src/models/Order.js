@@ -41,6 +41,12 @@ const orderSchema = new mongoose.Schema(
       unique: true,
     },
 
+    publicInvoiceId: {
+      type: String,
+      unique: true,
+      required: true,
+    },
+
     customerName: {
       type: String,
       required: true,
