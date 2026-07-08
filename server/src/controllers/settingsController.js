@@ -7,6 +7,20 @@ const getCurrentOrderNumber = async (req, res) => {
     if (!settings) {
       settings = await Setting.create({
         currentOrderNumber: 9000,
+
+        shopName: "Modern Tailors",
+
+        ownerName: "",
+
+        mobileNumber: "",
+
+        address: "",
+
+        upiId: "",
+
+        logoUrl: "",
+
+        currency: "₹",
       });
     }
 
@@ -32,6 +46,20 @@ const updateCurrentOrderNumber = async (req, res) => {
     if (!settings) {
       settings = await Setting.create({
         currentOrderNumber,
+
+        shopName: "Modern Tailors",
+
+        ownerName: "",
+
+        mobileNumber: "",
+
+        address: "",
+
+        upiId: "",
+
+        logoUrl: "",
+
+        currency: "₹",
       });
     } else {
       settings.currentOrderNumber = currentOrderNumber;

@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Setting = require("../models/Setting");
 const crypto = require("crypto");
+const { processItems } = require("../utils/orderUtils");
 
 const createOrder = async (req, res) => {
   try {
@@ -51,39 +52,10 @@ const createOrder = async (req, res) => {
       );
     }
 
-    let totalAmount = 0;
-
-    const processedItems = items.map(
-      (item, index) => {
-        const subtotal =
-          item.quantity * item.unitPrice;
-
-        totalAmount += subtotal;
-
-        return {
-          itemNumber: index + 1,
-
-          garmentType: item.garmentType,
-
-          quantity: item.quantity,
-
-          unitPrice: item.unitPrice,
-
-          subtotal,
-
-          measurements:
-            item.measurements || [],
-
-          fabricImageUrl:
-            item.fabricImageUrl || "",
-
-          note: item.note || "",
-
-          isUrgent:
-            item.isUrgent || false,
-        };
-      }
-    );
+    const {
+      processedItems,
+      totalAmount,
+    } = processItems(items);
 
     const transactions = [];
 
@@ -261,36 +233,93 @@ const updateOrder = async (req, res) => {
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found",
+        message: "Order not found.",
       });
     }
 
-    // If delivery date is changed but cutting date is not provided,
-    // automatically set cutting date to delivery date - 2 days
-    if (req.body.deliveryDate && !req.body.cuttingDate) {
-      const delivery = new Date(req.body.deliveryDate);
+    const {
+      customerName,
+      mobileNumber,
+      deliveryDate,
+      cuttingDate,
+      items,
+    } = req.body;
 
-      const cuttingDate = new Date(delivery);
-
-      cuttingDate.setDate(
-        cuttingDate.getDate() - 2
-      );
-
-      req.body.cuttingDate = cuttingDate;
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one garment is required.",
+      });
     }
 
-    const updatedOrder = await Order.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      {
-        new: true,
-        runValidators: true,
-      }
+    // Process all garments
+    const {
+      processedItems,
+      totalAmount,
+    } = processItems(items);
+
+    // Delivery & Cutting Date
+    let finalDeliveryDate = new Date(
+      deliveryDate || order.deliveryDate
     );
+
+    let finalCuttingDate;
+
+    if (cuttingDate) {
+      finalCuttingDate = new Date(cuttingDate);
+    } else {
+      finalCuttingDate = new Date(finalDeliveryDate);
+
+      finalCuttingDate.setDate(
+        finalCuttingDate.getDate() - 2
+      );
+    }
+
+    // Update order details
+    order.customerName =
+      customerName || order.customerName;
+
+    order.mobileNumber =
+      mobileNumber || order.mobileNumber;
+
+    order.deliveryDate = finalDeliveryDate;
+
+    order.cuttingDate = finalCuttingDate;
+
+    order.items = processedItems;
+
+    // Update total amount
+    order.payment.totalAmount = totalAmount;
+
+    // Calculate payment summary
+    const paidAmount =
+      order.payment.transactions.reduce(
+        (sum, transaction) =>
+          sum + transaction.amount,
+        0
+      );
+
+    const remainingAmount =
+      totalAmount - paidAmount;
+
+    // Update invoice status
+    if (remainingAmount <= 0) {
+      order.invoiceStatus = "Completed";
+    } else {
+      order.invoiceStatus = "Pending";
+    }
+
+    await order.save();
 
     res.status(200).json({
       success: true,
-      order: updatedOrder,
+      message: "Order updated successfully.",
+
+      paidAmount,
+
+      remainingAmount,
+
+      order,
     });
   } catch (error) {
     res.status(500).json({
@@ -316,7 +345,8 @@ const getTodayCuttings = async (req, res) => {
       today.getDate(),
       23,
       59,
-      59
+      59,
+      999
     );
 
     const orders = await Order.find({
@@ -324,12 +354,15 @@ const getTodayCuttings = async (req, res) => {
         $gte: startOfDay,
         $lte: endOfDay,
       },
-      isCuttingCompleted: false,
-    }).sort({ orderNumber: 1 });
+      "items.isCuttingCompleted": false,
+    }).sort({
+      cuttingDate: 1,
+      orderNumber: 1,
+    });
 
     res.status(200).json({
       success: true,
-      totalCuttings: orders.length,
+      totalOrders: orders.length,
       orders,
     });
   } catch (error) {
@@ -405,6 +438,65 @@ const completeCutting = async (req, res) => {
   }
 };
 
+const markGarmentReady = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    const item =
+      order.items.id(itemId) ||
+      order.items.find(
+        (orderItem) =>
+          orderItem.itemNumber === Number(itemId)
+      );
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Garment not found.",
+      });
+    }
+
+    if (item.status === "Ready") {
+      return res.status(400).json({
+        success: false,
+        message: "Garment is already marked as ready.",
+      });
+    }
+
+    if (item.status !== "Stitching") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only garments in Stitching can be marked as Ready.",
+      });
+    }
+
+    item.status = "Ready";
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Garment marked as ready.",
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const getTodayDeliveries = async (req, res) => {
   try {
     const today = new Date();
@@ -447,11 +539,15 @@ const getTodayDeliveries = async (req, res) => {
   }
 };
 
-const completePayment = async (req, res) => {
+const addPayment = async (req, res) => {
   try {
-    const { paymentMode } = req.body;
+    const { orderId } = req.params;
 
-    const order = await Order.findById(req.params.id);
+    const { amount, mode, note = "" } = req.body;
+
+    const paymentAmount = Number(amount);
+
+    const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({
@@ -460,18 +556,149 @@ const completePayment = async (req, res) => {
       });
     }
 
-    order.payment.remaining.mode = paymentMode;
+    const paidAmount = order.payment.transactions.reduce(
+      (sum, transaction) => sum + transaction.amount,
+      0
+    );
 
-    order.payment.remaining.amount = 0;
+    const remainingAmount =
+      order.payment.totalAmount - paidAmount;
 
-    order.status = "Delivered";
+    if (!paymentAmount || paymentAmount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment amount must be greater than 0.",
+      });
+    }
 
-    order.invoiceStatus = "Completed";
+    if (paymentAmount > remainingAmount) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment exceeds remaining balance.",
+      });
+    }
+
+    if (!["Cash", "Online"].includes(mode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payment mode.",
+      });
+    }
+
+    let transactionType;
+
+    if (order.payment.transactions.length === 0) {
+      transactionType = "Advance";
+    } else if (paymentAmount === remainingAmount) {
+      transactionType = "Final";
+    } else {
+      transactionType = "Partial";
+    }
+
+    order.payment.transactions.push({
+      amount: paymentAmount,
+      mode,
+      type: transactionType,
+      note,
+
+      // TODO: Replace with logged-in user's name after JWT authentication.
+      receivedBy: "Admin",
+    });
+
+    const newPaidAmount = order.payment.transactions.reduce(
+      (sum, transaction) => sum + transaction.amount,
+      0
+    );
+
+    const newRemaining =
+      order.payment.totalAmount - newPaidAmount;
+
+    if (newRemaining === 0) {
+      order.invoiceStatus = "Completed";
+    } else {
+      order.invoiceStatus = "Pending";
+    }
 
     await order.save();
 
     res.status(200).json({
       success: true,
+      message: "Payment added successfully.",
+      paidAmount: newPaidAmount,
+      remainingAmount: newRemaining,
+      order,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+const deliverItem = async (req, res) => {
+  try {
+    const { orderId, itemId } = req.params;
+
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    const item =
+      order.items.id(itemId) ||
+      order.items.find(
+        (orderItem) =>
+          orderItem.itemNumber === Number(itemId)
+      );
+
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Garment not found.",
+      });
+    }
+
+    // Prevent delivering the same garment twice
+    if (item.status === "Delivered") {
+      return res.status(400).json({
+        success: false,
+        message: "Garment is already delivered.",
+      });
+    }
+
+    // Only ready garments can be delivered
+    if (item.status !== "Ready") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only garments marked as 'Ready' can be delivered.",
+      });
+    }
+
+    // Mark garment as delivered
+    item.status = "Delivered";
+
+    // Check overall order status
+    const allDelivered = order.items.every(
+      (orderItem) => orderItem.status === "Delivered"
+    );
+
+    if (allDelivered) {
+      order.status = "Delivered";
+    } else {
+      order.status = "Partially Delivered";
+    }
+
+    await order.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Garment delivered successfully.",
       order,
     });
   } catch (error) {
@@ -489,6 +716,8 @@ module.exports = {
   updateOrder,
   getTodayCuttings,
   completeCutting,
+  markGarmentReady,
   getTodayDeliveries,
-  completePayment,
+  addPayment,
+  deliverItem,
 };

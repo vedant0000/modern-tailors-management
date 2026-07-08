@@ -111,6 +111,11 @@ const TransactionSchema = new mongoose.Schema(
       default: "",
     },
 
+    receivedBy: {
+      type: String,
+      default: "Admin",
+    },
+
     date: {
       type: Date,
       default: Date.now,

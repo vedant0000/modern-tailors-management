@@ -31,3 +31,6 @@ app.use("/api/settings", settingsRoutes);
 
 const orderRoutes = require("./routes/orderRoutes");
 app.use("/api/orders", orderRoutes);
+
+const invoiceRoutes = require("./routes/invoiceRoutes");
+app.use("/api/invoice", invoiceRoutes);
