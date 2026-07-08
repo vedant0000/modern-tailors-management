@@ -1,39 +1,127 @@
 const mongoose = require("mongoose");
 
-const paymentSchema = new mongoose.Schema({
-  totalAmount: {
-    type: Number,
-    required: true,
-  },
+const MeasurementSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+    },
 
-  advance: {
+    value: {
+      type: Number,
+      required: true,
+    },
+  },
+  {
+    _id: false,
+  }
+);
+
+const ItemSchema = new mongoose.Schema(
+  {
+    itemNumber: {
+      type: Number,
+      required: true,
+    },
+
+    garmentType: {
+      type: String,
+      required: true,
+    },
+
+    quantity: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
+    unitPrice: {
+      type: Number,
+      required: true,
+    },
+
+    subtotal: {
+      type: Number,
+      required: true,
+    },
+
+    measurements: {
+      type: [MeasurementSchema],
+      default: [],
+    },
+
+    fabricImageUrl: {
+      type: String,
+      default: "",
+    },
+
+    note: {
+      type: String,
+      default: "",
+    },
+
+    isUrgent: {
+      type: Boolean,
+      default: false,
+    },
+
+    status: {
+      type: String,
+      enum: [
+        "Pending",
+        "Cutting",
+        "Stitching",
+        "Ready",
+        "Delivered",
+      ],
+      default: "Pending",
+    },
+
+    isCuttingCompleted: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    _id: true,
+  }
+);
+
+const TransactionSchema = new mongoose.Schema(
+  {
     amount: {
       type: Number,
-      default: 0,
+      required: true,
     },
 
     mode: {
       type: String,
       enum: ["Cash", "Online"],
-      default: "Cash",
-    },
-  },
-
-  remaining: {
-    amount: {
-      type: Number,
-      default: 0,
+      required: true,
     },
 
-    mode: {
+    type: {
       type: String,
-      enum: ["Cash", "Online", null],
-      default: null,
+      enum: ["Advance", "Partial", "Final"],
+      required: true,
+    },
+
+    note: {
+      type: String,
+      default: "",
+    },
+
+    date: {
+      type: Date,
+      default: Date.now,
     },
   },
-});
+  {
+    _id: false,
+  }
+);
 
-const orderSchema = new mongoose.Schema(
+const OrderSchema = new mongoose.Schema(
   {
     orderNumber: {
       type: Number,
@@ -43,8 +131,8 @@ const orderSchema = new mongoose.Schema(
 
     publicInvoiceId: {
       type: String,
-      unique: true,
       required: true,
+      unique: true,
     },
 
     customerName: {
@@ -58,24 +146,15 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    dressType: {
-      type: String,
+    items: {
+      type: [ItemSchema],
       required: true,
-    },
-
-    measurements: {
-      type: mongoose.Schema.Types.Mixed,
-      default: {},
-    },
-
-    fabricImageUrl: {
-      type: String,
-      default: "",
-    },
-
-    note: {
-      type: String,
-      default: "",
+      validate: {
+        validator: function (items) {
+          return items.length > 0;
+        },
+        message: "At least one garment is required.",
+      },
     },
 
     orderDate: {
@@ -93,30 +172,33 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    payment: paymentSchema,
+    payment: {
+      totalAmount: {
+        type: Number,
+        required: true,
+      },
+
+      transactions: {
+        type: [TransactionSchema],
+        default: [],
+      },
+    },
 
     status: {
       type: String,
       enum: [
         "Pending",
-        "Cutting",
-        "Stitching",
-        "Ready",
+        "In Progress",
+        "Partially Delivered",
         "Delivered",
-        "Cancelled",
       ],
       default: "Pending",
     },
 
-    isCuttingCompleted: {
-        type: Boolean,
-        default: false,
-    },
-
     invoiceStatus: {
-        type: String,
-        enum: ["Pending", "Completed"],
-        default: "Pending",
+      type: String,
+      enum: ["Pending", "Completed"],
+      default: "Pending",
     },
   },
   {
@@ -124,4 +206,4 @@ const orderSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("Order", orderSchema);
+module.exports = mongoose.model("Order", OrderSchema);

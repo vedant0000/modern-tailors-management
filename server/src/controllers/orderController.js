@@ -7,26 +7,33 @@ const createOrder = async (req, res) => {
     const {
       customerName,
       mobileNumber,
-      dressType,
-      measurements,
-      fabricImageUrl,
-      note,
       deliveryDate,
-      totalAmount,
+      items,
       advanceAmount,
       advancePaymentMode,
     } = req.body;
+
+    if (!items || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one garment is required.",
+      });
+    }
 
     const settings = await Setting.findOne();
 
     if (!settings) {
       return res.status(400).json({
         success: false,
-        message: "Settings not found",
+        message: "Settings not found.",
       });
     }
 
-    const nextOrderNumber = settings.currentOrderNumber + 1;
+    const nextOrderNumber =
+      settings.currentOrderNumber + 1;
+
+    const publicInvoiceId =
+      crypto.randomBytes(16).toString("hex");
 
     const orderDate = new Date();
 
@@ -38,14 +45,59 @@ const createOrder = async (req, res) => {
       finalCuttingDate = new Date(req.body.cuttingDate);
     } else {
       finalCuttingDate = new Date(delivery);
+
       finalCuttingDate.setDate(
         finalCuttingDate.getDate() - 2
       );
     }
 
-    const remainingAmount = Number(totalAmount) - Number(advanceAmount);
+    let totalAmount = 0;
 
-    const publicInvoiceId = crypto.randomBytes(16).toString("hex");
+    const processedItems = items.map(
+      (item, index) => {
+        const subtotal =
+          item.quantity * item.unitPrice;
+
+        totalAmount += subtotal;
+
+        return {
+          itemNumber: index + 1,
+
+          garmentType: item.garmentType,
+
+          quantity: item.quantity,
+
+          unitPrice: item.unitPrice,
+
+          subtotal,
+
+          measurements:
+            item.measurements || [],
+
+          fabricImageUrl:
+            item.fabricImageUrl || "",
+
+          note: item.note || "",
+
+          isUrgent:
+            item.isUrgent || false,
+        };
+      }
+    );
+
+    const transactions = [];
+
+    if (Number(advanceAmount) > 0) {
+      transactions.push({
+        amount: Number(advanceAmount),
+
+        mode: advancePaymentMode,
+
+        type: "Advance",
+
+        note: "Advance Payment",
+      });
+    }
 
     const order = await Order.create({
       orderNumber: nextOrderNumber,
@@ -53,15 +105,10 @@ const createOrder = async (req, res) => {
       publicInvoiceId,
 
       customerName,
+
       mobileNumber,
 
-      dressType,
-
-      measurements,
-
-      fabricImageUrl,
-
-      note,
+      items: processedItems,
 
       orderDate,
 
@@ -71,23 +118,21 @@ const createOrder = async (req, res) => {
 
       payment: {
         totalAmount,
-
-        advance: {
-          amount: advanceAmount,
-          mode: advancePaymentMode,
-        },
-
-        remaining: {
-          amount: remainingAmount,
-        },
+        transactions,
       },
+
+      status: "Pending",
+
+      invoiceStatus: "Pending",
     });
 
     settings.currentOrderNumber = nextOrderNumber;
+
     await settings.save();
 
     res.status(201).json({
       success: true,
+      message: "Order created successfully.",
       order,
     });
   } catch (error) {
@@ -297,7 +342,9 @@ const getTodayCuttings = async (req, res) => {
 
 const completeCutting = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id);
+    const { orderId, itemId } = req.params;
+
+    const order = await Order.findById(orderId);
 
     if (!order) {
       return res.status(404).json({
@@ -306,14 +353,32 @@ const completeCutting = async (req, res) => {
       });
     }
 
-    order.isCuttingCompleted = true;
+    const item = order.items.id(itemId);
 
-    order.status = "Cutting";
+    if (!item) {
+      return res.status(404).json({
+        success: false,
+        message: "Garment not found",
+      });
+    }
+
+    item.isCuttingCompleted = true;
+
+    item.status = "Stitching";
+
+    const allItemsCut = order.items.every(
+      (item) => item.isCuttingCompleted
+    );
+
+    if (allItemsCut) {
+      order.status = "In Progress";
+    }
 
     await order.save();
 
     res.status(200).json({
       success: true,
+      message: "Garment cutting completed.",
       order,
     });
   } catch (error) {

@@ -17,6 +17,6 @@ router.get("/:id", getOrderById);
 
 router.put("/:id", updateOrder);
 
-router.put("/:id/complete-cutting", completeCutting);
+router.put("/:orderId/items/:itemId/complete-cutting", completeCutting);
 
 module.exports = router;
