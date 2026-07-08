@@ -480,7 +480,7 @@ const markGarmentReady = async (req, res) => {
       });
     }
 
-    item.status = "Ready";
+    item.status = ORDER_STATUS.READY;
 
     await order.save();
 
