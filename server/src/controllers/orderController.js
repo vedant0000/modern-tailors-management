@@ -344,6 +344,13 @@ const completeCutting = async (req, res) => {
   try {
     const { orderId, itemId } = req.params;
 
+    if (!itemId) {
+      return res.status(400).json({
+        success: false,
+        message: "Garment ID is required",
+      });
+    }
+
     const order = await Order.findById(orderId);
 
     if (!order) {
@@ -353,7 +360,12 @@ const completeCutting = async (req, res) => {
       });
     }
 
-    const item = order.items.id(itemId);
+    const item =
+      order.items.id(itemId) ||
+      order.items.find(
+        (orderItem) =>
+          orderItem.itemNumber === Number(itemId)
+      );
 
     if (!item) {
       return res.status(404).json({
@@ -366,11 +378,15 @@ const completeCutting = async (req, res) => {
 
     item.status = "Stitching";
 
-    const allItemsCut = order.items.every(
-      (item) => item.isCuttingCompleted
+    const hasCutItems = order.items.some(
+      (orderItem) => orderItem.isCuttingCompleted
     );
 
-    if (allItemsCut) {
+    if (
+      hasCutItems &&
+      order.status !== "Delivered" &&
+      order.status !== "Partially Delivered"
+    ) {
       order.status = "In Progress";
     }
 
