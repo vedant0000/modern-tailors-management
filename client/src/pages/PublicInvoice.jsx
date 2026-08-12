@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api/api";
 import "../styles/invoice.css";
+import logo from "../assets/logo.png";
 
 function PublicInvoice() {
   const { publicInvoiceId } = useParams();
@@ -86,7 +87,11 @@ function PublicInvoice() {
         {/* Header */}
         <header className="invoice-header">
           <div>
-            <h1>MODERN TAILORS</h1>
+            <img
+                src={logo}
+                alt="Modern Tailors"
+                className="invoice-logo"
+            />
             <p>Customer Invoice</p>
           </div>
 
