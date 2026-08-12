@@ -23,6 +23,11 @@ router.get("/deliveries/today", getTodayDeliveries);
 
 router.post("/:orderId/payment", addPayment);
 
+router.get(
+  "/invoice/:publicInvoiceId",
+  getPublicInvoice
+);
+
 router.get("/:id", getOrderById);
 
 router.put("/:id", updateOrder);

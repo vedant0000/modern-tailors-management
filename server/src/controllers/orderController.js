@@ -226,6 +226,69 @@ const getOrderById = async (req, res) => {
   }
 };
 
+const getPublicInvoice = async (req, res) => {
+  try {
+    const { publicInvoiceId } = req.params;
+
+    if (!publicInvoiceId) {
+      return res.status(400).json({
+        success: false,
+        message: "Public invoice ID is required.",
+      });
+    }
+
+    const order = await Order.findOne({
+      publicInvoiceId,
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found.",
+      });
+    }
+
+    const paidAmount = order.payment.transactions.reduce(
+      (sum, transaction) => sum + transaction.amount,
+      0
+    );
+
+    const remainingAmount =
+      order.payment.totalAmount - paidAmount;
+
+    res.status(200).json({
+      success: true,
+
+      invoice: {
+        publicInvoiceId: order.publicInvoiceId,
+        orderNumber: order.orderNumber,
+
+        customerName: order.customerName,
+        mobileNumber: order.mobileNumber,
+
+        orderDate: order.orderDate,
+        deliveryDate: order.deliveryDate,
+
+        items: order.items,
+
+        payment: {
+          totalAmount: order.payment.totalAmount,
+          paidAmount,
+          remainingAmount,
+          transactions: order.payment.transactions,
+        },
+
+        invoiceStatus: order.invoiceStatus,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 const updateOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -331,33 +394,14 @@ const updateOrder = async (req, res) => {
 
 const getTodayCuttings = async (req, res) => {
   try {
-    const today = new Date();
-
-    const startOfDay = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate()
-    );
-
-    const endOfDay = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-      23,
-      59,
-      59,
-      999
-    );
-
     const orders = await Order.find({
-      cuttingDate: {
-        $gte: startOfDay,
-        $lte: endOfDay,
+      items: {
+        $elemMatch: {
+          isCuttingCompleted: false,
+        },
       },
-      "items.isCuttingCompleted": false,
     }).sort({
       cuttingDate: 1,
-      orderNumber: 1,
     });
 
     res.status(200).json({
@@ -380,7 +424,7 @@ const completeCutting = async (req, res) => {
     if (!itemId) {
       return res.status(400).json({
         success: false,
-        message: "Garment ID is required",
+        message: "Garment ID is required.",
       });
     }
 
@@ -389,7 +433,7 @@ const completeCutting = async (req, res) => {
     if (!order) {
       return res.status(404).json({
         success: false,
-        message: "Order not found",
+        message: "Order not found.",
       });
     }
 
@@ -403,20 +447,25 @@ const completeCutting = async (req, res) => {
     if (!item) {
       return res.status(404).json({
         success: false,
-        message: "Garment not found",
+        message: "Garment not found.",
+      });
+    }
+
+    if (item.isCuttingCompleted) {
+      return res.status(400).json({
+        success: false,
+        message: "Garment cutting is already completed.",
       });
     }
 
     item.isCuttingCompleted = true;
-
     item.status = "Stitching";
 
-    const hasCutItems = order.items.some(
+    const allCuttingCompleted = order.items.every(
       (orderItem) => orderItem.isCuttingCompleted
     );
 
     if (
-      hasCutItems &&
       order.status !== "Delivered" &&
       order.status !== "Partially Delivered"
     ) {
@@ -427,7 +476,10 @@ const completeCutting = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Garment cutting completed.",
+      message: allCuttingCompleted
+        ? "All garment cutting completed."
+        : "Garment cutting completed.",
+      allCuttingCompleted,
       order,
     });
   } catch (error) {
@@ -480,7 +532,7 @@ const markGarmentReady = async (req, res) => {
       });
     }
 
-    item.status = ORDER_STATUS.READY;
+    item.status = "Ready";
 
     await order.save();
 
@@ -513,7 +565,8 @@ const getTodayDeliveries = async (req, res) => {
       today.getDate(),
       23,
       59,
-      59
+      59,
+      999
     );
 
     const orders = await Order.find({
@@ -521,14 +574,21 @@ const getTodayDeliveries = async (req, res) => {
         $gte: startOfDay,
         $lte: endOfDay,
       },
-      status: {
-        $ne: "Delivered",
+
+      items: {
+        $elemMatch: {
+          status: {
+            $ne: "Delivered",
+          },
+        },
       },
-    }).sort({ orderNumber: 1 });
+    }).sort({
+      deliveryDate: 1,
+    });
 
     res.status(200).json({
       success: true,
-      totalDeliveries: orders.length,
+      totalOrders: orders.length,
       orders,
     });
   } catch (error) {
@@ -712,6 +772,7 @@ const deliverItem = async (req, res) => {
 module.exports = {
   createOrder,
   getOrders,
+  getPublicInvoice,
   getOrderById,
   updateOrder,
   getTodayCuttings,
