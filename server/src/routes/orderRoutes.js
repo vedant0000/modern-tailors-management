@@ -8,7 +8,8 @@ const { createOrder,
         getTodayDeliveries, 
         addPayment, 
         deliverItem, 
-        markGarmentReady 
+        markGarmentReady,
+        getPublicInvoice
     } = require("../controllers/orderController");
 
 const router = express.Router();
