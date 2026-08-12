@@ -57,19 +57,55 @@ const createOrder = async (req, res) => {
       totalAmount,
     } = processItems(items);
 
+    const paymentAmount = Number(advanceAmount) || 0;
+
     const transactions = [];
 
-    if (Number(advanceAmount) > 0) {
+    if (paymentAmount > 0) {
+      if (!advancePaymentMode) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment mode is required when an advance is provided.",
+        });
+      }
+
+      if (!["Cash", "Online"].includes(advancePaymentMode)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid payment mode.",
+        });
+      }
+
+      if (paymentAmount > totalAmount) {
+        return res.status(400).json({
+          success: false,
+          message: "Advance payment cannot exceed total amount.",
+        });
+      }
+
+      const transactionType =
+        paymentAmount === totalAmount
+          ? "Final"
+          : "Advance";
+
       transactions.push({
-        amount: Number(advanceAmount),
-
+        amount: paymentAmount,
         mode: advancePaymentMode,
-
-        type: "Advance",
-
-        note: "Advance Payment",
+        type: transactionType,
+        note:
+          transactionType === "Final"
+            ? "Full Payment"
+            : "Advance Payment",
       });
     }
+
+    const remainingAmount =
+      totalAmount - paymentAmount;
+
+    const invoiceStatus =
+      remainingAmount === 0
+        ? "Completed"
+        : "Pending";
 
     const order = await Order.create({
       orderNumber: nextOrderNumber,
@@ -95,7 +131,7 @@ const createOrder = async (req, res) => {
 
       status: "Pending",
 
-      invoiceStatus: "Pending",
+      invoiceStatus,
     });
 
     settings.currentOrderNumber = nextOrderNumber;
