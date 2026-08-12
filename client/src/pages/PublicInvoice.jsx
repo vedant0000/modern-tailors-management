@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import api from "../api/api";
+import "../styles/invoice.css";
 
 function PublicInvoice() {
   const { publicInvoiceId } = useParams();
