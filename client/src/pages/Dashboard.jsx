@@ -1,8 +1,35 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { getDashboardStats } from "../services/dashboardService";
 import logo from "../assets/logo.png";
 import "../styles/dashboard.css";
 
 function Dashboard() {
+
+    const [dashboardData, setDashboardData] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    const fetchDashboardData = async () => {
+        try {
+            const data = await getDashboardStats();
+            setDashboardData(data);
+        } catch (error) {
+            console.error("Failed to load dashboard", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <div className="dashboard-loading">
+            Loading dashboard...
+            </div>
+        );
+    }
   return (
     <div className="dashboard-page">
       <aside className="dashboard-sidebar">
@@ -75,7 +102,9 @@ function Dashboard() {
               <span className="stat-icon">▤</span>
             </div>
 
-            <strong className="stat-value">0</strong>
+            <strong className="stat-value">
+                {dashboardData?.totalOrders || 0}
+            </strong>
 
             <span className="stat-description">
               All orders in the system
@@ -88,7 +117,9 @@ function Dashboard() {
               <span className="stat-icon">₹</span>
             </div>
 
-            <strong className="stat-value">₹0</strong>
+            <strong className="stat-value">
+                ₹{dashboardData?.totalRevenue || 0}
+            </strong>
 
             <span className="stat-description">
               Revenue from all orders
@@ -101,7 +132,9 @@ function Dashboard() {
               <span className="stat-icon">✂</span>
             </div>
 
-            <strong className="stat-value">0</strong>
+            <strong className="stat-value">
+                {dashboardData?.todaysCutting || 0}
+            </strong>
 
             <span className="stat-description">
               Garments scheduled for cutting
@@ -114,7 +147,9 @@ function Dashboard() {
               <span className="stat-icon">✓</span>
             </div>
 
-            <strong className="stat-value">0</strong>
+            <strong className="stat-value">
+                {dashboardData?.todaysDeliveries || 0}
+            </strong>
 
             <span className="stat-description">
               Orders scheduled for delivery

@@ -34,3 +34,6 @@ app.use("/api/orders", orderRoutes);
 
 const invoiceRoutes = require("./routes/invoiceRoutes");
 app.use("/api/invoice", invoiceRoutes);
+
+const dashboardRoutes = require("./routes/dashboardRoutes");
+app.use("/api/dashboard", dashboardRoutes);
