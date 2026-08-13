@@ -339,7 +339,7 @@
   padding: 44px 25px;
   border: 1px dashed #d2d2d7;
   border-radius: 12px;
-  text-align: center;
+  text-align: left;
 }
 
 .empty-state-icon {
