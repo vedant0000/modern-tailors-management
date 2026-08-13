@@ -171,18 +171,51 @@ function Dashboard() {
             </div>
 
             <div className="empty-state">
-              <div className="empty-state-icon">▤</div>
+              {dashboardData?.recentOrders?.length > 0 ? (
+                <div className="recent-orders-list">
+                    {dashboardData.recentOrders.map((order) => (
+                    <div
+                        key={order._id}
+                        className="recent-order-item"
+                    >
+                        <div>
+                        <strong>
+                            #{order.orderNumber}
+                        </strong>
 
-              <h4>No orders to display</h4>
+                        <p className="recent-order-customer">
+                            {order.customerName}
+                        </p>
+                        </div>
 
-              <p>
-                Your recent orders will appear here once you start
-                creating orders.
-              </p>
+                        <div className="recent-order-right">
+                        <span>
+                            ₹{order.payment.totalAmount}
+                        </span>
 
-              <button className="empty-state-button">
-                Create First Order
-              </button>
+                        <small>
+                            {order.status}
+                        </small>
+                        </div>
+                    </div>
+                    ))}
+                </div>
+                ) : (
+                <div className="empty-state">
+                    <div className="empty-state-icon">▤</div>
+
+                    <h4>No orders to display</h4>
+
+                    <p>
+                    Your recent orders will appear here once you start
+                    creating orders.
+                    </p>
+
+                    <button className="empty-state-button">
+                    Create First Order
+                    </button>
+                </div>
+                )}
             </div>
           </div>
 
@@ -205,7 +238,9 @@ function Dashboard() {
                   <span>Garments scheduled today</span>
                 </div>
 
-                <strong className="today-work-count">0</strong>
+                <strong className="today-work-count">
+                    {dashboardData?.todaysCutting || 0}
+                </strong>
               </div>
 
               <div className="today-work-item">
@@ -218,7 +253,9 @@ function Dashboard() {
                   <span>Orders scheduled today</span>
                 </div>
 
-                <strong className="today-work-count">0</strong>
+                <strong className="today-work-count">
+                    {dashboardData?.todaysDeliveries || 0}
+                </strong>
               </div>
 
               <div className="today-work-item">
@@ -231,7 +268,9 @@ function Dashboard() {
                   <span>Payments received today</span>
                 </div>
 
-                <strong className="today-work-count">0</strong>
+                <strong className="today-work-count">
+                    {dashboardData?.todaysPayments || 0}
+                </strong>
               </div>
             </div>
           </div>
