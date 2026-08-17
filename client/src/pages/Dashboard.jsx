@@ -2,11 +2,13 @@ import React, { useEffect, useState } from "react";
 import { getDashboardStats } from "../services/dashboardService";
 import logo from "../assets/logo.png";
 import "../styles/dashboard.css";
+import { useNavigate } from "react-router-dom";
 
 function Dashboard() {
 
     const [dashboardData, setDashboardData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
     useEffect(() => {
         fetchDashboardData();
@@ -47,7 +49,8 @@ function Dashboard() {
             Dashboard
           </button>
 
-          <button className="sidebar-link">
+          <button className="sidebar-link" 
+            onClick={() => navigate("/orders")}>
             <span>▤</span>
             Orders
           </button>
@@ -165,7 +168,8 @@ function Dashboard() {
                 <h3>Recent Orders</h3>
               </div>
 
-              <button className="panel-action">
+              <button className="panel-action"
+                onClick={() => navigate("/orders")}>
                 View All
               </button>
             </div>
